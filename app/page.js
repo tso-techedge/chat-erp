@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Header from '../components/Header';
-import AdvisorSelection from '../components/AdvisorSelection';
-import ChatInterface from '../components/ChatInterface';
+import { useState } from "react";
+import Header from "../components/Header";
+import AdvisorSelection from "../components/AdvisorSelection";
+import ChatInterface from "../components/chat/ChatInterface";
 
 export default function Home() {
   const [selectedAdvisor, setSelectedAdvisor] = useState(null);
@@ -11,7 +11,7 @@ export default function Home() {
   return (
     <div className="app">
       <Header />
-      
+
       {selectedAdvisor ? (
         <ChatInterface advisor={selectedAdvisor} />
       ) : (

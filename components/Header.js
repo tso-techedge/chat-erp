@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import styled from 'styled-components';
+import { advisorThemes } from '../app/utils/advisorThemes';
 
 const HeaderContainer = styled.header`
   background-color: #0a3977;
@@ -10,6 +11,13 @@ const HeaderContainer = styled.header`
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid #062c5e;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 `;
 
 const Logo = styled.div`
@@ -48,7 +56,68 @@ const MenuButton = styled.button`
   }
 `;
 
-const DropdownMenu = styled.div`
+const ThemeSwitcher = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 4px 10px;
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  font-size: 13px;
+  color: white;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  position: relative;
+  margin-right: 20px;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+  }
+
+  svg {
+    margin-right: 6px;
+  }
+`;
+
+const ThemeDropdown = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'isOpen',
+})`
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  margin-top: 8px;
+  overflow: hidden;
+  display: ${props => props.$isOpen ? 'block' : 'none'};
+  min-width: 200px;
+`;
+
+const ThemeOption = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: #495057;
+  transition: background-color 0.2s;
+  background-color: ${(props) => (props.active ? "#f0f7ff" : "transparent")};
+  
+  &:hover {
+    background-color: ${(props) => (props.active ? "#f0f7ff" : "#f8f9fa")};
+  }
+  
+  svg {
+    margin-right: 8px;
+    color: #0a3977;
+  }
+`;
+
+const DropdownMenu = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'isOpen',
+})`
   position: absolute;
   top: 60px;
   right: 0;
@@ -57,7 +126,7 @@ const DropdownMenu = styled.div`
   box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
   min-width: 220px;
   z-index: 1000;
-  display: ${(props) => (props.isOpen ? "block" : "none")};
+  display: ${props => props.$isOpen ? 'block' : 'none'};
   overflow: hidden;
   border: 1px solid #f0f0f0;
 `;
@@ -90,9 +159,11 @@ const MenuDivider = styled.div`
   margin: 4px 0;
 `;
 
-function Header() {
+function Header({ activeTab, setActiveTab }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
   const menuRef = useRef(null);
+  const themeDropdownRef = useRef(null);
   
   // Close menu when clicking outside
   useEffect(() => {
@@ -100,13 +171,16 @@ function Header() {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setMenuOpen(false);
       }
+      if (themeDropdownRef.current && !themeDropdownRef.current.contains(event.target)) {
+        setThemeDropdownOpen(false);
+      }
     }
     
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [menuRef]);
+  }, [menuRef, themeDropdownRef]);
   
   // Function to handle starting a new chat
   const handleNewChat = () => {
@@ -138,12 +212,113 @@ function Header() {
         </LogoIcon>
         ChatERP
       </Logo>
-      <Link href="/chat" style={{ color: 'white', textDecoration: 'none', marginRight: '20px', display: 'flex', alignItems: 'center' }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '6px' }}>
-          <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        Chat
-      </Link>
+      
+      {/* Theme Switcher */}
+      {activeTab !== undefined && setActiveTab && (
+        <div ref={themeDropdownRef}>
+          <ThemeSwitcher onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              {activeTab === "general" ? (
+                <path
+                  d="M12 12m-8 0a8 8 0 1 0 16 0a8 8 0 1 0 -16 0"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+              ) : activeTab === "document-analyzer" ? (
+                <path
+                  d="M14 3v4a1 1 0 001 1h4M17 21h-10a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+              ) : activeTab === "ask-controllers" ? (
+                <path
+                  d="M12 8c-2.2 0-4 1.8-4 4s1.8 4 4 4 4-1.8 4-4-1.8-4-4-4zM3 12h1m17 0h1M5.6 5.6l.7.7m12.1-.7l-.7.7M12 3v1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+              ) : (
+                <path
+                  d="M12 12m-8 0a8 8 0 1 0 16 0a8 8 0 1 0 -16 0"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+              )}
+            </svg>
+            {advisorThemes.find((t) => t.id === activeTab)?.name || "General"}
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              style={{
+                marginLeft: "6px",
+                transform: themeDropdownOpen
+                  ? "rotate(180deg)"
+                  : "rotate(0deg)",
+              }}
+            >
+              <path
+                d="M7 10l5 5 5-5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <ThemeDropdown $isOpen={themeDropdownOpen}>
+              {advisorThemes.map((theme) => (
+                <ThemeOption
+                  key={theme.id}
+                  active={activeTab === theme.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveTab(theme.id);
+                    setThemeDropdownOpen(false);
+                  }}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    {theme.id === "general" && (
+                      <path
+                        d="M12 12m-8 0a8 8 0 1 0 16 0a8 8 0 1 0 -16 0"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                    )}
+                    {theme.id === "document-analyzer" && (
+                      <path
+                        d="M14 3v4a1 1 0 001 1h4M17 21h-10a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                    )}
+                    {theme.id === "ask-controllers" && (
+                      <path
+                        d="M12 8c-2.2 0-4 1.8-4 4s1.8 4 4 4 4-1.8 4-4-1.8-4-4-4zM3 12h1m17 0h1M5.6 5.6l.7.7m12.1-.7l-.7.7M12 3v1"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                    )}
+                  </svg>
+                  {theme.name}
+                </ThemeOption>
+              ))}
+            </ThemeDropdown>
+          </ThemeSwitcher>
+        </div>
+      )}
       <MenuButtonContainer ref={menuRef}>
         <MenuButton onClick={() => setMenuOpen(!menuOpen)}>
           <svg
@@ -163,7 +338,7 @@ function Header() {
           </svg>
         </MenuButton>
         
-        <DropdownMenu isOpen={menuOpen}>
+        <DropdownMenu $isOpen={menuOpen}>
           <MenuItem onClick={handleNewChat}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>

@@ -1,27 +1,66 @@
 import { NextResponse } from "next/server";
 
+// Handle OPTIONS requests for CORS preflight
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
+}
+
 // Handler for GET requests (used for streaming)
 export async function GET(request) {
   // Reuse the same logic as POST but with query parameters
-  return handleChatRequest(request, true);
+  const response = await handleChatRequest(request, true);
+
+  // Add CORS headers
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", "*");
+  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 // Handler for POST requests
 export async function POST(request) {
-  return handleChatRequest(request, false);
+  const response = await handleChatRequest(request, false);
+
+  // Add CORS headers
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", "*");
+  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 // Shared handler for both GET and POST requests
 async function handleChatRequest(request, isGetRequest) {
   try {
-    let message, advisorId, thinkMode = false, streamMode = false;
-    
+    let message,
+      advisorId,
+      thinkMode = false, // Set to false by default
+      streamMode = true;
+
     if (isGetRequest) {
       // Parse query parameters for GET requests (streaming)
       const url = new URL(request.url);
-      message = url.searchParams.get('message') || '';
-      advisorId = url.searchParams.get('advisorId') || 'general';
-      thinkMode = url.searchParams.get('thinkMode') === 'true';
+      message = url.searchParams.get("message") || "";
+      advisorId = url.searchParams.get("advisorId") || "general";
+      thinkMode = url.searchParams.get("thinkMode") === "true";
       streamMode = true;
     } else {
       // Parse JSON body for POST requests
@@ -34,32 +73,39 @@ async function handleChatRequest(request, isGetRequest) {
 
     // Get the appropriate system message based on the advisor
     let systemMessage = getSystemMessage(advisorId);
-    
-    // Add think mode instructions if enabled
-    if (thinkMode) {
-      systemMessage += "\n\nPlease think step by step. First, analyze the question carefully. Then, break down your reasoning process explicitly, showing your work as you arrive at the answer. Consider different angles and explain your thought process in detail.\n\nWrap your thinking process in <think> and </think> tags. After your thinking process, provide a clear, concise final answer without the tags. For example:\n<think>\nHere I analyze the problem...\nStep 1: ...\nStep 2: ...\n</think>\nHere's my final answer based on my analysis.";
-    }
+
+    // Think mode is disabled - no system message modification
+    // thinkMode parameter is kept for backward compatibility
 
     const API_URL =
       process.env.API_URL || "https://api.operatornext.cn/v1/chat/completions";
     const API_KEY = process.env.API_KEY;
 
-    // If streaming is requested, handle it differently
-    if (streamMode || isGetRequest) {
-      // Create a TransformStream for streaming the response
-      const encoder = new TextEncoder();
-      const decoder = new TextDecoder();
-      const stream = new TransformStream();
-      const writer = stream.writable.getWriter();
+    if (process.env.NODE_ENV === "development") {
+      console.log("API_URL:", API_URL);
+      console.log("API_KEY:", API_KEY);
+    }
 
-      // Start the fetch request without awaiting it
-      fetch(API_URL, {
+    if (!API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "API key is not configured" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // If streaming is requested, forward the stream directly
+    if (streamMode || isGetRequest) {
+      const response = await fetch(API_URL, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${API_KEY}`,
-          Referer: "",
-          Accept: "application/json, text/event-stream",
           "Content-Type": "application/json",
+          Accept: "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
         },
         body: JSON.stringify({
           messages: [
@@ -72,76 +118,35 @@ async function handleChatRequest(request, isGetRequest) {
               content: message,
             },
           ],
-          stream: true, // Enable streaming
+          stream: true,
           model: "deepseek-v3-250324",
           temperature: 0.5,
           presence_penalty: 0,
           frequency_penalty: 0,
           top_p: 1,
-          max_tokens: 4000,
         }),
-      }).then(async (response) => {
-        if (!response.ok) {
-          const errorMessage = `API error: ${response.status}`;
-          writer.write(encoder.encode(`data: ${JSON.stringify({ error: errorMessage })}\n\n`));
-          writer.close();
-          return;
-        }
-
-        const reader = response.body.getReader();
-        let buffer = "";
-
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            // Decode the chunk and add it to our buffer
-            buffer += decoder.decode(value, { stream: true });
-            
-            // Process complete SSE messages
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || ""; // Keep the last incomplete line in the buffer
-            
-            for (const line of lines) {
-              if (line.startsWith("data: ")) {
-                const data = line.slice(6); // Remove "data: " prefix
-                if (data === "[DONE]") {
-                  // End of stream
-                  writer.write(encoder.encode(`data: [DONE]\n\n`));
-                  continue;
-                }
-                
-                try {
-                  const parsed = JSON.parse(data);
-                  if (parsed.choices && parsed.choices[0].delta && parsed.choices[0].delta.content) {
-                    // Forward the content chunk
-                    writer.write(encoder.encode(`data: ${JSON.stringify({ content: parsed.choices[0].delta.content })}\n\n`));
-                  }
-                } catch (e) {
-                  console.error("Error parsing SSE message:", e);
-                }
-              }
-            }
-          }
-        } catch (error) {
-          console.error("Error reading stream:", error);
-          writer.write(encoder.encode(`data: ${JSON.stringify({ error: error.message })}\n\n`));
-        } finally {
-          writer.close();
-        }
-      }).catch((error) => {
-        console.error("Fetch error:", error);
-        writer.write(encoder.encode(`data: ${JSON.stringify({ error: error.message })}\n\n`));
-        writer.close();
       });
 
-      // Return the readable stream as the response
-      return new Response(stream.readable, {
+      if (!response.ok) {
+        const error = await response.text();
+        console.error("API Error:", error);
+        return new Response(
+          JSON.stringify({ error: "Failed to fetch from API" }),
+          {
+            status: response.status,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+
+      // Forward the response with appropriate headers
+      return new Response(response.body, {
         headers: {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
-          "Connection": "keep-alive",
+          Connection: "keep-alive",
         },
       });
     } else {
