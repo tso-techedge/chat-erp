@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Header from '../../../components/Header';
-import ChatInterface from '../../../components/ChatInterface';
+import ChatInterface from '../../../components/chat/ChatInterface';
 
 export default function ChatPage({ params }) {
   const { id } = params;
