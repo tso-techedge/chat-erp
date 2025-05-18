@@ -587,6 +587,47 @@ const SidebarToggle = styled.button`
   }
 `;
 
+const ComingSoonPopup = styled.div`
+  position: absolute;
+  top: -50px;
+  left: 0;
+  z-index: 100;
+  animation: fadeInOut 3s ease;
+  
+  @keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(10px); }
+    15% { opacity: 1; transform: translateY(0); }
+    85% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-10px); }
+  }
+`;
+
+const PopupContent = styled.div`
+  background-color: #343a40;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  
+  svg {
+    margin-right: 8px;
+    color: #ffc107;
+  }
+  
+  &:after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 20px;
+    border-width: 8px 8px 0;
+    border-style: solid;
+    border-color: #343a40 transparent transparent;
+  }
+`;
+
 const InfoTooltip = styled.span`
   position: relative;
   display: inline-block;
@@ -767,6 +808,7 @@ const ChatInterface = ({ advisor }) => {
   const [showSidebar, setShowSidebar] = useState(true);
   const [expandedThink, setExpandedThink] = useState({});
   const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
+  const [showAttachmentPopup, setShowAttachmentPopup] = useState(false);
 
   const messagesEndRef = useRef(null);
   const textAreaRef = useRef(null);
@@ -1599,11 +1641,27 @@ I see you're testing the thinking mode feature! This is working correctly if you
           <InputArea>
             <InputContainer>
               <InputActions>
-                <ActionButton title="Attach file">
+                <ActionButton 
+                  title="Attach file" 
+                  onClick={() => {
+                    setShowAttachmentPopup(true);
+                    setTimeout(() => setShowAttachmentPopup(false), 3000);
+                  }}
+                >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </ActionButton>
+                {showAttachmentPopup && (
+                  <ComingSoonPopup>
+                    <PopupContent>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-4h2v2h-2zm0-10h2v8h-2z" fill="currentColor"/>
+                      </svg>
+                      <span>Demo Only</span>
+                    </PopupContent>
+                  </ComingSoonPopup>
+                )}
               </InputActions>
               <TextArea
                 ref={textAreaRef}
